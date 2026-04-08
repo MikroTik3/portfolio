@@ -1,0 +1,224 @@
+# Надсилання електронної пошти через BullMQ у NestJS
+
+У сучасних вебзастосунках надсилання електронних листів є звичайною справою — підтвердження пошти, скидання пароля, повідомлення користувачам тощо. Але якщо це робити синхронно (тобто прямо в обробнику запиту), ви ризикуєте:
+
+<ul>
+  <li>уповільнити відповідь клієнту,</li>
+  <li>отримати помилку через збій SMTP або перевищення тайм-ауту,</li>
+  <li>створити вузьке місце в масштабованості системи.</li>
+</ul>
+
+Щоб цього уникнути, ми можемо <b>делегувати надсилання листів у фонову чергу</b>, де за це відповідатиме окремий <b>воркер</b>. У цьому блозі я покажу, як реалізувати таке рішення на базі <b>NestJS, BullMQ, Redis</b> та <b>@react-email/components</b> для шаблонів.
+
+---
+
+## Переваги використання воркера для надсилання листів
+
+<b>BullMQ</b> — це потужна черга задач на базі Redis. Вона дозволяє:
+
+<ul>
+  <li>обробляти листи асинхронно (поза межами HTTP-запиту),</li>
+  <li>автоматично повторювати задачі у разі помилки,</li>
+  <li>масштабувати процес через окремі воркери,</li>
+  <li>логувати успішні/невдалі надсилання,</li>
+  <li>налаштовувати пріоритети, затримки, обмеження на кількість обробок.</li>
+</ul>
+
+---
+
+## 1. Конфігурація BullMQ (Redis)
+
+Почнемо з налаштування BullMQ через <code>bullmq.config.ts</code>:
+
+```ts
+import { ConfigService } from '@nestjs/config'
+import type { QueueOptions } from 'bullmq'
+
+export function getBullmqConfig(configService: ConfigService): QueueOptions {
+    return {
+        connection: {
+            username: configService.getOrThrow<string>('REDIS_USER'),
+            host: configService.getOrThrow<string>('REDIS_HOST'),
+            port: configService.getOrThrow<number>('REDIS_PORT'),
+            password: configService.getOrThrow<string>('REDIS_PASSWORD'),
+            maxRetriesPerRequest: null,
+            retryStrategy: times => Math.min(times * 50, 2000)
+        },
+        prefix: configService.getOrThrow<string>('QUEUE_PREFIX')
+    }
+}
+```
+
+Цей конфіг дозволяє кастомізувати з'єднання з Redis — ми беремо всі параметри з <code>.env</code>, додаємо retry-стратегію, а також задаємо префікс для назв черг, щоб розділяти їх між мікросервісами.
+
+---
+
+## 2. Сервіс для пошти: MailService
+
+У сервісі ми формуємо шаблон листа через <code>@react-email/components</code>, а саму задачу відправляємо в чергу:
+
+```ts
+await this.queue.add(
+    'send-email',
+    { email: user.email, subject: 'Верифікація пошти', html },
+    { removeOnComplete: true }
+)
+```
+
+Так ми гарантуємо, що сама поштова логіка буде оброблена пізніше і воркером.
+
+Сервіс виглядає так:
+
+```ts
+@Injectable()
+export class MailService {
+    public constructor(
+        private readonly mailerService: MailerService,
+        @InjectQueue('mail') private readonly queue: Queue
+    ) {}
+
+    public async sendEmailVerification(user: User, token: string) {
+        const html = await render(EmailVerificationTemplate({ user, token }))
+        await this.queue.add('send-email', { email: user.email, subject: 'Верифікація пошти', html }, { removeOnComplete: true })
+        return true
+    }
+
+    public async sendPasswordReset(user: User, token: string) {
+        const html = await render(ResetPasswordTemplate({ user, token }))
+        await this.queue.add('send-email', { email: user.email, subject: 'Скидання пароля', html }, { removeOnComplete: true })
+        return true
+    }
+
+    public sendMail(email: string, subject: string, html: string) {
+        return this.mailerService.sendMail({ to: email, subject, html })
+    }
+}
+```
+
+---
+
+## 3. Воркер (процесор): MailProcessor
+
+Воркер — це той самий "робітник", який слухає чергу <code>"mail"</code> і обробляє задачі типу <code>"send-email"</code>:
+
+```ts
+@Processor('mail')
+@Injectable()
+export class MailProcessor extends WorkerHost {
+    private readonly logger = new Logger(MailProcessor.name)
+
+    public constructor(private readonly mailService: MailService) {
+        super()
+    }
+
+    public async process(job: Job<{ email: string; subject: string; html: string }>): Promise<void> {
+        const { email, subject, html } = job.data
+        try {
+            await this.mailService.sendMail(email, subject, html)
+            this.logger.log(`📧 Email successfully sent to ${email}`)
+        } catch (error) {
+            this.logger.error(`❌ Error sending email to ${email}: ${error.message}`)
+        }
+    }
+}
+```
+
+---
+
+## 4. Модуль: MailModule
+
+У модулі ми підключаємо MailerModule та BullModule, а також реєструємо наш воркер:
+
+```ts
+@Global()
+@Module({
+    imports: [
+        MailerModule.forRootAsync({
+            imports: [ConfigModule],
+            useFactory: getMailerConfig,
+            inject: [ConfigService]
+        }),
+        BullModule.registerQueue({
+            name: 'mail'
+        })
+    ],
+    providers: [MailService, MailProcessor],
+    exports: [MailService]
+})
+export class MailModule {}
+```
+
+Модуль <code>@nestjs/bullmq</code> автоматично підключає Redis, створює чергу та запускає воркер — тобто нам не потрібно вручну створювати Queue, Worker чи QueueScheduler.
+
+---
+
+## 5. Підтримка SWC у NestJS
+
+Якщо ти використовуєш <code>swc</code> як компілятор (для швидшої збірки), потрібно правильно налаштувати <code>nest-cli.json</code>. Інакше BullMQ може не знайти процесори (через особливості трансформації).
+
+```json
+{
+      "$schema": "https://json.schemastore.org/nest-cli",
+      "collection": "@nestjs/schematics",
+      "sourceRoot": "src",
+      "compilerOptions": {
+          "deleteOutDir": true,
+          "builder": {
+              "type": "swc",
+              "options": {
+                  "swcrcPath": "/.swcrc.json",
+                  "extensions": [".js", ".ts", ".jsx", ".tsx"]
+              }
+          },
+          "typeCheck": true
+    }
+}
+```
+
+---
+
+## 6. Шаблони листів через React
+
+Замість шаблонів у форматі <code>.hbs</code> чи <code>.mjml</code>, я використовую <b>@react-email/components</b> — вони дозволяють будувати шаблони на React, використовувати Tailwind і навіть рендерити прев’ю в dev mode. Наприклад, шаблон для скидання пароля виглядає ось так:
+
+```tsx
+export function ResetPasswordTemplate({ user, token }: ResetPasswordTemplateProps) {
+    const resetLink = `${baseUrl}/auth/recovery/${token}`
+
+    return (
+        <Html>
+            <Head>
+                <Font
+                    fontFamily='Geist'
+                    webFont={{ url: 'https://fonts.googleapis.com/css2?family=Geist', format: 'woff2' }}
+                />
+            </Head>
+            <Tailwind>
+                <Body>
+                    <Preview>Скидання пароля</Preview>
+                    <Container className='...'>
+                        <Heading>Скидання пароля</Heading>
+                        <Text>Привіт, {user.displayName}!</Text>
+                        <Button href={resetLink}>Скинути пароль</Button>
+                    </Container>
+                </Body>
+            </Tailwind>
+        </Html>
+    )
+}
+```
+
+---
+
+## Підсумок
+
+Цей підхід дозволяє нам:
+
+<ul>
+  <li>відділити відправку листів від основного потоку логіки,</li>
+  <li>уникати затримок і тайм-аутів,</li>
+  <li>масштабувати обробку email-повідомлень,</li>
+  <li>легко кастомізувати шаблони і логіку надсилання.</li>
+</ul>
+
+Кінець!)

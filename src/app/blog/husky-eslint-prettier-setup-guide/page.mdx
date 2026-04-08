@@ -1,0 +1,154 @@
+# Husky, Lint-Staged, Commitlint та Prettier у Next.js
+
+Для підтримки якості коду в проєкті використовується набір інструментів:
+
+- **Husky** — дозволяє підключати Git-хуки, зокрема `pre-commit` та `commit-msg`.
+- **Lint-Staged** — застосовує форматування і лінт лише до змінених файлів.
+- **Commitlint** — перевіряє, що повідомлення коміту відповідає прийнятому стандарту (наприклад, Conventional Commits).
+- **Prettier** — автоматично форматує код згідно зі встановленими правилами.
+
+## Переваги
+
+- Забезпечується єдине форматування коду незалежно від середовища розробника.
+- Код, який не відповідає ESLint або Prettier, не потрапляє у репозиторій.
+- Повідомлення комітів мають єдину структуру, що спрощує генерацію changelog і навігацію по історії змін.
+- Прискорюється рев’ю за рахунок відсутності стилістичних зауважень.
+
+---
+
+## 1. Налаштування Commitlint
+
+```ts
+import type { UserConfig } from '@commitlint/types'
+
+const Configuration: UserConfig = {
+	extends: ['@commitlint/config-conventional'],
+	parserPreset: 'conventional-changelog-atom',
+	formatter: '@commitlint/format',
+	rules: {
+		'type-enum': [
+			2,
+			'always',
+			[
+				'feat',
+				'fix',
+				'docs',
+				'style',
+				'refactor',
+				'perf',
+				'test',
+				'build',
+				'ci',
+				'chore',
+				'revert'
+			]
+		],
+		'scope-enum': [
+			2,
+			'always',
+			[
+				'setup',
+				'config',
+				'deps',
+				'feature',
+				'bug',
+				'docs',
+				'style',
+				'refactor',
+				'test',
+				'build',
+				'ci',
+				'release',
+				'other'
+			]
+		]
+	}
+}
+
+export default Configuration
+```
+
+---
+
+## 2. Налаштування Prettier
+
+```json
+{
+	"trailingComma": "none",
+	"tabWidth": 6,
+	"useTabs": true,
+	"semi": false,
+	"jsxSingleQuote": true,
+	"singleQuote": true,
+	"arrowParens": "avoid",
+	"importOrder": [
+		"<THIRD_PARTY_MODULES>",
+		"^@/app/(.*)$",
+		"^@/components/(.*)$",
+		"^@/constants/(.*)$",
+		"^@/hooks/(.*)$",
+		"^@/lib/(.*)$",
+		"^@/server/(.*)$",
+		"^@/styles/(.*)$",
+		"^../(.*)$",
+		"^./(.*)$"
+	],
+	"importOrderSeparation": true,
+	"importOrderSortSpecifiers": true,
+	"plugins": [
+		"@trivago/prettier-plugin-sort-imports",
+		"prettier-plugin-tailwindcss"
+	]
+}
+```
+
+Цей конфігураційний файл встановлює порядок імпортів, правила форматування та підключає плагіни для Tailwind CSS і сортування імпортів.
+
+---
+
+## 3. Налаштування Lint-Staged
+
+```json
+{
+	"*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix", "eslint"],
+	"*.{json,md,yml}": ["prettier --write"]
+}
+```
+
+Lint-Staged виконує форматування й лінт тільки для тих файлів, які змінено, що суттєво пришвидшує процес коміту.
+
+---
+
+## 4. Налаштування Lint-Staged
+
+<code>.husky/pre-commit</code>
+
+```bash
+npm run lint-staged --concurrent false
+```
+
+Перед кожним комітом запускається форматування та лінт змінених файлів.
+
+<code>.husky/commit-msg</code>
+
+```bash
+npx --no -- commitlint --edit $1
+```
+
+Цей Git-хук перевіряє відповідність повідомлення коміту визначеним правилам.
+
+---
+
+## Загальний результат
+
+Завдяки такій конфігурації кожен коміт:
+
+<ul>
+  <li>проходить перевірку форматування (Prettier),</li>
+  <li>лінтується за ESLint,</li>
+  <li>має правильну структуру повідомлення (Commitlint),</li>
+  <li>обробляє тільки змінені файли (Lint-Staged),</li>
+  <li>автоматично перевіряється при git commit (Husky).</li>
+</ul>
+
+Це гарантує єдині стандарти кодування та покращує якість коду з самого початку.
