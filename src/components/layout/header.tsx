@@ -4,12 +4,14 @@ import Link from 'next/link'
 
 import { TextEffect } from '@/components/ui/text-effect'
 
+import { ROUTES } from '@/constants'
+
 export function Header() {
 	return (
 		<header className='mb-8 flex items-center justify-between'>
 			<div>
 				<Link
-					href='/'
+					href={ROUTES.HOME}
 					className='font-medium text-black dark:text-white'
 				>
 					Артур Доценко

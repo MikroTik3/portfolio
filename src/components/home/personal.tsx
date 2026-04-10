@@ -4,14 +4,6 @@ import { XIcon } from 'lucide-react'
 import { motion } from 'motion/react'
 import Link from 'next/link'
 
-import {
-	BLOG_POSTS,
-	EMAIL,
-	PROJECTS,
-	SOCIAL_LINKS,
-	WORK_EXPERIENCE
-} from '@/app/data'
-
 import { AnimatedBackground } from '@/components/ui/animated-background'
 import { Magnetic } from '@/components/ui/magnetic'
 import {
@@ -22,6 +14,14 @@ import {
 	MorphingDialogTrigger
 } from '@/components/ui/morphing-dialog'
 import { Spotlight } from '@/components/ui/spotlight'
+
+import {
+	BLOG_POSTS,
+	EMAIL,
+	PROJECTS,
+	SOCIAL_LINKS,
+	WORK_EXPERIENCE
+} from '@/constants/data'
 
 const VARIANTS_CONTAINER = {
 	hidden: { opacity: 0 },

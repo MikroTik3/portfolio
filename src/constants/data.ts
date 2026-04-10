@@ -36,10 +36,10 @@ export const PROJECTS: Project[] = [
 		id: 'project1'
 	},
 	{
-		name: 'Template Admin',
+		name: 'Studio admin',
 		description:
 			'Адмінка на Next.js + shadcn/ui: таблиці, графи, теми.',
-		link: 'https://nuxt-shadcn-dashboard-starter.vercel.app',
+		link: 'https://next-shadcn-dashboard-starter.vercel.app/auth/login',
 		photo: 'http://res.cloudinary.com/terieyenike/image/upload/v1753457282/uploaded/Screenshot%202025-07-25%20at%2018.27.45.png.png',
 		id: 'project2'
 	}
@@ -47,20 +47,20 @@ export const PROJECTS: Project[] = [
 
 export const WORK_EXPERIENCE: WorkExperience[] = [
 	{
+		company: 'AK LEADS',
+		title: 'Фронтенд-розробник (Vue / Php)',
+		start: '2022',
+		end: '2024',
+		link: '/experience/ak-leads',
+		id: 'work2'
+	},
+	{
 		company: 'Open Source проєкти та фриланс-замовлення',
-		title: 'Фронтенд-розробник (React / Vue)',
-		start: '2023',
+		title: 'Фронтенд-розробник (Vue / React / Next.js)',
+		start: '2024',
 		end: '2025',
 		link: '/experience/opensourse',
 		id: 'work1'
-	},
-	{
-		company: 'Приватна веб-студія (фріланс проєкти в команді)',
-		title: 'Фронтенд-розробник (Vue / Nuxt)',
-		start: '2022',
-		end: '2023',
-		link: '/experience/web-studio',
-		id: 'work2'
 	}
 ]
 
@@ -84,11 +84,11 @@ export const BLOG_POSTS: BlogPost[] = [
 export const SOCIAL_LINKS: SocialLink[] = [
 	{
 		label: 'Github',
-		link: 'https://github.com/MikroTik2'
+		link: 'https://github.com/MikroTik3'
 	},
 	{
 		label: 'LinkedIn',
-		link: 'https://www.linkedin.com/in/artur-docenko-0a3a722a1'
+		link: 'https://www.linkedin.com/in/artur-docenko'
 	},
 	{
 		label: 'Telegram',

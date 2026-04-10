@@ -1,3 +1,3 @@
 export const APP_CONFIG = {
-	baseUrl: process.env['APP_URL']
+	baseUrl: process.env.NEXT_PUBLIC_APP_URL
 } as const
