@@ -13,10 +13,8 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
-		"lint-staged": "lint-staged",
 		"format": "prettier --check .",
-		"format:fix": "prettier --write --list-different .",
-		"prepare": "husky"
+		"format:fix": "prettier --write --list-different ."
 	},
 	"dependencies": {
 		"@mdx-js/loader": "^3.1.0",
